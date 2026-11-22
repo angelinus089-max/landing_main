@@ -1,0 +1,45 @@
+# Build & Dependencies
+node_modules/
+dist/
+dist-ssr/
+build/
+
+# Environment & Secrets (절대 외부 노출 금지)
+.env
+.env.*
+!.env.example
+
+# OS & Editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Vercel & Logs
+.vercel/
+*.log
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.local
+
+# Memo & AI Instructions (비밀값 노출 위험 방지)
+memo*.md
+note*.md
+scratch/
+tmp/
+*.test.*
+*.local.*
+CLAUDE.md
+GEMINI.md
+
+.vercel
