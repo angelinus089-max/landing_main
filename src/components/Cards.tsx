@@ -1,5 +1,5 @@
 import { useModalState } from '../state/ModalState'
-import { isFeatured } from '../data/featured'
+import { isExhibitionOngoing } from '../data/featured'
 import type { ArtistItem, Exhibition, SpaceItem } from '../types'
 
 export function ExhibitionCard({ item }: { item: Exhibition }) {
@@ -7,7 +7,7 @@ export function ExhibitionCard({ item }: { item: Exhibition }) {
   return (
     <button type="button" onClick={() => openDetail('exhibition', item.id)} className="group animate-fade-in-up text-left">
       <div className="relative aspect-[3/4] overflow-hidden bg-white">
-        {isFeatured(item.tags) && (
+        {isExhibitionOngoing(item.period, item.tags) && (
           <span className="absolute left-2 top-2 z-10 bg-slate-900 px-2 py-1 text-[11px] font-medium text-white">
             전시 중
           </span>

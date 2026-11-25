@@ -7,7 +7,7 @@ import ImageUploadList from './ImageUploadList'
 import LinksEditor from './LinksEditor'
 import ExpandableTextarea from './ExpandableTextarea'
 import { useSelection } from '../../utils/useSelection'
-import { ARCHIVED_TAG, FEATURED_TAG, isArchived } from '../../data/featured'
+import { ARCHIVED_TAG, FEATURED_TAG, MANUAL_ENDED_TAG, isArchived, getExhibitionStatus } from '../../data/featured'
 
 type Tab = 'exhibition' | 'space' | 'artist'
 
@@ -111,6 +111,7 @@ function ItemRow({
   image,
   title,
   subtitle,
+  badge,
   checked,
   onToggleCheck,
   archived,
@@ -125,6 +126,7 @@ function ItemRow({
   image: string
   title: string
   subtitle: string
+  badge?: React.ReactNode
   checked: boolean
   onToggleCheck: () => void
   archived: boolean
@@ -148,6 +150,7 @@ function ItemRow({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
             <p className="break-words text-sm font-medium text-slate-900">{title}</p>
+            {badge}
             {archived && <span className="shrink-0 bg-slate-200 px-1.5 py-0.5 text-[10px] text-slate-600">보관됨</span>}
           </div>
           <p className="break-words text-xs text-slate-400">{subtitle}</p>
@@ -295,24 +298,42 @@ function ExhibitionManager() {
       onDeleteSelected={handleDeleteSelected}
       onArchiveSelected={handleArchiveSelected}
     >
-      {exhibitions.map((item, index) => (
-        <ItemRow
-          key={item.id}
-          image={item.images[0]}
-          title={item.title}
-          subtitle={`${item.space} x ${item.artist} · ${item.period}`}
-          checked={selected.includes(item.id)}
-          onToggleCheck={() => toggle(item.id)}
-          archived={isArchived(item.tags)}
-          onToggleArchive={() => updateExhibitionItem({ ...item, tags: toggleTag(item.tags, ARCHIVED_TAG) })}
-          onEdit={() => setEditing(item)}
-          onDelete={() => deleteExhibitionItem(item.id)}
-          onMoveUp={() => reorderExhibitions(moveInArray(exhibitions, index, -1).map((e) => e.id))}
-          onMoveDown={() => reorderExhibitions(moveInArray(exhibitions, index, 1).map((e) => e.id))}
-          disableUp={index === 0}
-          disableDown={index === exhibitions.length - 1}
-        />
-      ))}
+      {exhibitions.map((item, index) => {
+        const status = getExhibitionStatus(item.period, item.tags)
+        const statusBadge = (
+          <span
+            className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+              status === 'ongoing'
+                ? 'bg-emerald-100 text-emerald-800'
+                : status === 'upcoming'
+                  ? 'bg-blue-100 text-blue-800'
+                  : 'bg-slate-100 text-slate-500'
+            }`}
+          >
+            {status === 'ongoing' ? '● 전시 중' : status === 'upcoming' ? '○ 전시 예정' : '전시 종료'}
+          </span>
+        )
+
+        return (
+          <ItemRow
+            key={item.id}
+            image={item.images[0]}
+            title={item.title}
+            subtitle={`${item.space} x ${item.artist} · ${item.period}`}
+            badge={statusBadge}
+            checked={selected.includes(item.id)}
+            onToggleCheck={() => toggle(item.id)}
+            archived={isArchived(item.tags)}
+            onToggleArchive={() => updateExhibitionItem({ ...item, tags: toggleTag(item.tags, ARCHIVED_TAG) })}
+            onEdit={() => setEditing(item)}
+            onDelete={() => deleteExhibitionItem(item.id)}
+            onMoveUp={() => reorderExhibitions(moveInArray(exhibitions, index, -1).map((e) => e.id))}
+            onMoveDown={() => reorderExhibitions(moveInArray(exhibitions, index, 1).map((e) => e.id))}
+            disableUp={index === 0}
+            disableDown={index === exhibitions.length - 1}
+          />
+        )
+      })}
     </ListShell>
   )
 }
@@ -347,21 +368,16 @@ function ExhibitionForm({
   const [tags, setTags] = useState(base.tags)
   const [description, setDescription] = useState(base.description)
 
-  const featured = tags.includes(FEATURED_TAG)
+  const currentPeriod = formatPeriod(start, end)
+  const currentStatus = getExhibitionStatus(currentPeriod, tags)
+  const isForcedOngoing = tags.includes(FEATURED_TAG)
+  const isForcedEnded = tags.includes(MANUAL_ENDED_TAG)
+  const isAuto = !isForcedOngoing && !isForcedEnded
 
   return (
-    <FormShell error={error} saving={saving} onCancel={onCancel} onSave={() => onSave({ title, space, artist, period: formatPeriod(start, end), images, tags, description })}>
+    <FormShell error={error} saving={saving} onCancel={onCancel} onSave={() => onSave({ title, space, artist, period: currentPeriod, images, tags, description })}>
       <div>
-        <div className="mb-1.5 flex items-center justify-between">
-          <label className="text-sm text-slate-600">사진 (여러 장 등록 가능, 첫 번째가 대표 이미지)</label>
-          <button
-            type="button"
-            onClick={() => setTags((prev) => toggleTag(prev, FEATURED_TAG))}
-            className={`border px-2 py-1 text-xs transition ${featured ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 text-slate-500'}`}
-          >
-            {featured ? '★ 전시 중으로 표시됨' : '☆ 전시 중으로 표시'}
-          </button>
-        </div>
+        <label className="mb-1.5 block text-sm text-slate-600">사진 (여러 장 등록 가능, 첫 번째가 대표 이미지)</label>
         <ImageUploadList images={images} onChange={setImages} />
       </div>
       <div>
@@ -382,6 +398,71 @@ function ExhibitionForm({
           <input type="date" value={start} onChange={(e) => setStart(e.target.value)} className="input" />
           <span className="text-slate-400">~</span>
           <input type="date" value={end} onChange={(e) => setEnd(e.target.value)} className="input" />
+        </div>
+      </div>
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-slate-700">전시 상태 설정 ('전시 중' 배지 관리)</label>
+        <div className="rounded border border-slate-200 bg-slate-50/70 p-3.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setTags((prev) => prev.filter((t) => t !== FEATURED_TAG && t !== MANUAL_ENDED_TAG))}
+              className={`rounded border px-3 py-1.5 text-xs font-medium transition ${
+                isAuto
+                  ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              📅 기간에 따라 자동 판정 (기본)
+            </button>
+            <button
+              type="button"
+              onClick={() => setTags((prev) => [...prev.filter((t) => t !== MANUAL_ENDED_TAG && t !== FEATURED_TAG), FEATURED_TAG])}
+              className={`rounded border px-3 py-1.5 text-xs font-medium transition ${
+                isForcedOngoing
+                  ? 'border-emerald-600 bg-emerald-600 text-white shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              ★ 항상 '전시 중'으로 표시
+            </button>
+            <button
+              type="button"
+              onClick={() => setTags((prev) => [...prev.filter((t) => t !== FEATURED_TAG && t !== MANUAL_ENDED_TAG), MANUAL_ENDED_TAG])}
+              className={`rounded border px-3 py-1.5 text-xs font-medium transition ${
+                isForcedEnded
+                  ? 'border-rose-600 bg-rose-600 text-white shadow-sm'
+                  : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              ✕ '전시 종료'로 표시 (숨김)
+            </button>
+          </div>
+          <div className="mt-2.5 flex items-center gap-2 text-xs text-slate-600">
+            <span>실제 적용 상태:</span>
+            <span
+              className={`inline-flex items-center gap-1 rounded px-2 py-0.5 font-semibold ${
+                currentStatus === 'ongoing'
+                  ? 'bg-emerald-100 text-emerald-800'
+                  : currentStatus === 'upcoming'
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-slate-200 text-slate-700'
+              }`}
+            >
+              {currentStatus === 'ongoing' ? '🟢 전시 중' : currentStatus === 'upcoming' ? '🔵 전시 예정' : '⚪ 전시 종료'}
+            </span>
+            <span className="text-slate-400">
+              {isForcedOngoing
+                ? '(관리자가 수동으로 전시 중 고정함)'
+                : isForcedEnded
+                  ? '(관리자가 수동으로 전시 종료 지정함)'
+                  : end && new Date() > new Date(end)
+                    ? '(종료일이 지나 자동으로 종료됨)'
+                    : start && new Date() < new Date(start)
+                      ? '(시작 전이므로 예정 상태)'
+                      : '(전시 기간 내이므로 전시 중)'}
+            </span>
+          </div>
         </div>
       </div>
       <div>

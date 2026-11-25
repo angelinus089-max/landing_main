@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useModalState } from '../../state/ModalState'
 import { useAppState } from '../../state/AppState'
 import { useBodyScrollLock } from '../../utils/useBodyScrollLock'
-import { isFeatured, visibleTags } from '../../data/featured'
+import { isExhibitionOngoing, visibleTags } from '../../data/featured'
 
 export default function DetailModal() {
   const { detailTarget, closeDetail } = useModalState()
@@ -85,7 +85,7 @@ export default function DetailModal() {
             )}
           </div>
           <div>
-            {exhibition && isFeatured(exhibition.tags) && (
+            {exhibition && isExhibitionOngoing(exhibition.period, exhibition.tags) && (
               <span className="mb-2 inline-block bg-slate-900 px-2 py-1 text-[11px] font-medium text-white">전시 중</span>
             )}
             <h2 className="break-words text-2xl font-medium text-slate-900">{title}</h2>
